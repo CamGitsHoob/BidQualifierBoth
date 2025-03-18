@@ -83,12 +83,107 @@ interface RFPData {
   website_details: WebsiteDetails
 }
 
+const renderDataItem = (item: any, label: string, showInterpreted: boolean, confidenceThreshold: number) => {
+  // Handle the new data structure with confidence
+  if (item && typeof item === 'object' && 'value' in item) {
+    const { value, confidence, is_interpreted } = item;
+    
+    // Apply filters
+    if (confidence < confidenceThreshold) {
+      return <dd className="mt-1 text-sm text-gray-400">Hidden (low confidence)</dd>;
+    }
+    
+    if (is_interpreted && !showInterpreted) {
+      return <dd className="mt-1 text-sm text-gray-400">Hidden (interpretation)</dd>;
+    }
+    
+    // If no value, show "Not specified"
+    if (!value) {
+      return <dd className="mt-1 text-sm text-gray-400">Not specified</dd>;
+    }
+    
+    // Determine color based on confidence
+    let confidenceColor = "bg-gray-100";
+    if (confidence > 0.8) {
+      confidenceColor = "bg-green-100";
+    } else if (confidence > 0.5) {
+      confidenceColor = "bg-yellow-100";
+    } else if (confidence > 0) {
+      confidenceColor = "bg-red-100";
+    }
+    
+    return (
+      <div>
+        <dd className="mt-1 text-sm text-gray-900">{value}</dd>
+        <div className="flex items-center mt-1 space-x-2">
+          <div className="w-full bg-gray-200 rounded-full h-1.5">
+            <div 
+              className={`h-1.5 rounded-full ${confidenceColor}`} 
+              style={{ width: `${confidence * 100}%` }}
+            ></div>
+          </div>
+          <span className="text-xs text-gray-500">{Math.round(confidence * 100)}%</span>
+          {is_interpreted && (
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">
+              Interpreted
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  }
+  
+  // Handle the old data structure (simple string)
+  return <dd className="mt-1 text-sm text-gray-900">{item || 'Not specified'}</dd>;
+};
+
 export default function AnalysisPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [rfpData, setRfpData] = useState<RFPData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [similarityScore, setSimilarityScore] = useState<number | null>(null)
+  const [showInterpreted, setShowInterpreted] = useState(true)
+  const [confidenceThreshold, setConfidenceThreshold] = useState(0)
   const params = useParams()
+
+  const renderFilterControls = () => (
+    <div className="bg-white rounded-lg shadow-lg overflow-hidden mb-8">
+      <div className="bg-indigo-50 px-6 py-4">
+        <h2 className="text-xl font-semibold text-gray-900">Display Options</h2>
+      </div>
+      <div className="p-6 flex flex-wrap gap-6">
+        <div className="flex items-center">
+          <input
+            id="show-interpreted"
+            type="checkbox"
+            checked={showInterpreted}
+            onChange={(e) => setShowInterpreted(e.target.checked)}
+            className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+          />
+          <label htmlFor="show-interpreted" className="ml-2 block text-sm text-gray-900">
+            Show interpreted data
+          </label>
+        </div>
+        
+        <div className="w-64">
+          <label htmlFor="confidence" className="block text-sm font-medium text-gray-700">
+            Minimum confidence:
+          </label>
+          <select
+            id="confidence"
+            value={confidenceThreshold}
+            onChange={(e) => setConfidenceThreshold(parseFloat(e.target.value))}
+            className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+          >
+            <option value={0}>Show all</option>
+            <option value={0.3}>Low confidence (30%+)</option>
+            <option value={0.5}>Medium confidence (50%+)</option>
+            <option value={0.7}>High confidence (70%+)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  );
 
   useEffect(() => {
     const fetchAnalysis = async () => {
@@ -254,9 +349,10 @@ export default function AnalysisPage() {
           </div>
         ) : (
           <>
+            {renderFilterControls()}
 
-                      {/* Similarity Score Section */}
-                      <div className="bg-white rounded-lg shadow-lg overflow-hidden mb-8">
+            {/* Similarity Score Section */}
+            <div className="bg-white rounded-lg shadow-lg overflow-hidden mb-8">
               <div className="bg-green-100 px-6 py-4">
                 <h2 className="text-xl font-semibold text-gray-900">Similarity Score</h2>
               </div>
@@ -287,6 +383,36 @@ export default function AnalysisPage() {
                 </div>
               </div>
             </div>
+
+            {/* Add this right after the similarity score section */}
+            <div className="bg-white rounded-lg shadow-lg overflow-hidden mb-8">
+              <div className="bg-gray-50 px-6 py-4">
+                <h2 className="text-xl font-semibold text-gray-900">Data Confidence Legend</h2>
+              </div>
+              <div className="p-6">
+                <div className="flex flex-wrap gap-4">
+                  <div className="flex items-center">
+                    <div className="w-4 h-4 bg-green-100 rounded mr-2"></div>
+                    <span className="text-sm">High confidence (80-100%)</span>
+                  </div>
+                  <div className="flex items-center">
+                    <div className="w-4 h-4 bg-yellow-100 rounded mr-2"></div>
+                    <span className="text-sm">Medium confidence (50-80%)</span>
+                  </div>
+                  <div className="flex items-center">
+                    <div className="w-4 h-4 bg-red-100 rounded mr-2"></div>
+                    <span className="text-sm">Low confidence (1-50%)</span>
+                  </div>
+                  <div className="flex items-center">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 mr-2">
+                      Interpreted
+                    </span>
+                    <span className="text-sm">AI interpretation (not directly stated in RFP)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Strategic Summary Section */}
             <div className="bg-white rounded-lg shadow-lg overflow-hidden mb-8">
               <div className="bg-blue-100 px-6 py-4">
@@ -298,9 +424,7 @@ export default function AnalysisPage() {
                     <dt className="text-sm font-medium text-gray-500 capitalize mb-2">
                       {key.replace(/_/g, ' ')}
                     </dt>
-                    <dd className="text-sm text-gray-900 whitespace-pre-wrap">
-                      {value || 'Not specified'}
-                    </dd>
+                    {renderDataItem(value, key, showInterpreted, confidenceThreshold)}
                   </div>
                 ))}
               </div>
@@ -317,7 +441,7 @@ export default function AnalysisPage() {
                     <dt className="text-sm font-medium text-gray-500 capitalize">
                       {key.replace(/_/g, ' ')}
                     </dt>
-                    <dd className="mt-1 text-sm text-gray-900">{value || 'Not specified'}</dd>
+                    {renderDataItem(value, key, showInterpreted, confidenceThreshold)}
                   </div>
                 ))}
               </div>
@@ -331,7 +455,7 @@ export default function AnalysisPage() {
                   {Object.entries(rfpData.bid_summary || {}).map(([key, value]) => (
                     <div key={key} className="border-b border-gray-200 pb-4">
                       <dt className="text-sm font-medium text-gray-500 capitalize">{key.replace(/_/g, ' ')}</dt>
-                      <dd className="mt-1 text-sm text-gray-900">{value || 'Not specified'}</dd>
+                      {renderDataItem(value, key, showInterpreted, confidenceThreshold)}
                     </div>
                   ))}
                 </div>
@@ -346,7 +470,7 @@ export default function AnalysisPage() {
                   {Object.entries(rfpData.key_dates || {}).map(([key, value]) => (
                     <div key={key} className="border-b border-gray-200 pb-4">
                       <dt className="text-sm font-medium text-gray-500 capitalize">{key.replace(/_/g, ' ')}</dt>
-                      <dd className="mt-1 text-sm text-gray-900">{value || 'Not specified'}</dd>
+                      {renderDataItem(value, key, showInterpreted, confidenceThreshold)}
                     </div>
                   ))}
                 </div>
@@ -364,7 +488,7 @@ export default function AnalysisPage() {
                     <dt className="text-sm font-medium text-gray-500 capitalize">
                       {key.replace(/_/g, ' ')}
                     </dt>
-                    <dd className="mt-1 text-sm text-gray-900">{value || 'Not specified'}</dd>
+                    {renderDataItem(value, key, showInterpreted, confidenceThreshold)}
                   </div>
                 ))}
               </div>
@@ -378,7 +502,7 @@ export default function AnalysisPage() {
                   {Object.entries(rfpData.requirements || {}).map(([key, value]) => (
                     <div key={key} className="border-b border-gray-200 pb-4">
                       <dt className="text-sm font-medium text-gray-500 capitalize">{key.replace(/_/g, ' ')}</dt>
-                      <dd className="mt-1 text-sm text-gray-900">{value || 'Not specified'}</dd>
+                      {renderDataItem(value, key, showInterpreted, confidenceThreshold)}
                     </div>
                   ))}
                 </div>
@@ -396,7 +520,7 @@ export default function AnalysisPage() {
                     <dt className="text-sm font-medium text-gray-500 capitalize">
                       {key.replace(/_/g, ' ')}
                     </dt>
-                    <dd className="mt-1 text-sm text-gray-900">{value || 'Not specified'}</dd>
+                    {renderDataItem(value, key, showInterpreted, confidenceThreshold)}
                   </div>
                 ))}
               </div>
@@ -410,7 +534,7 @@ export default function AnalysisPage() {
                   {Object.entries(rfpData.commercials || {}).map(([key, value]) => (
                     <div key={key} className="border-b border-gray-200 pb-4">
                       <dt className="text-sm font-medium text-gray-500 capitalize">{key.replace(/_/g, ' ')}</dt>
-                      <dd className="mt-1 text-sm text-gray-900">{value || 'Not specified'}</dd>
+                      {renderDataItem(value, key, showInterpreted, confidenceThreshold)}
                     </div>
                   ))}
                 </div>
@@ -425,7 +549,7 @@ export default function AnalysisPage() {
                   {Object.entries(rfpData.flags || {}).map(([key, value]) => (
                     <div key={key} className="border-b border-gray-200 pb-4">
                       <dt className="text-sm font-medium text-gray-500 capitalize">{key.replace(/_/g, ' ')}</dt>
-                      <dd className="mt-1 text-sm text-gray-900">{value || 'Not specified'}</dd>
+                      {renderDataItem(value, key, showInterpreted, confidenceThreshold)}
                     </div>
                   ))}
                 </div>

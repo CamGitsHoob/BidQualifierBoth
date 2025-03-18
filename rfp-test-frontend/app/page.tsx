@@ -104,7 +104,6 @@ export default function BidQualifierPage() {
       if (!response.ok) {
         throw new Error(await response.text() || 'Failed to analyze text')
       }
-
       const analysisData = await response.json()
       console.log('Received analysis data:', analysisData)
       

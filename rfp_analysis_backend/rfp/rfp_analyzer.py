@@ -50,100 +50,333 @@ class RFPAnalyzer:
 
             {
                 "strategic_summary": {
-                    "overview": "High-level summary of the opportunity",
-                    "key_differentiators": "What's needed to win this bid",
-                    "risks_and_challenges": "Major considerations and potential issues",
-                    "recommended_approach": "Suggested strategy and win themes",
-                    "resource_needs": "Key personnel or capabilities required",
-                    "competitive_landscape": "Market context and competitive insights"
+                    "overview": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    },
+                    "key_differentiators": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    },
+                    "risks_and_challenges": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    },
+                    "recommended_approach": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    },
+                    "resource_needs": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    },
+                    "competitive_landscape": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    }
                 },
-
                 "introduction/background": {
-                    "introduction": "",
-                    "background": ""
+                    "introduction": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    },
+                    "background": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    }
                 },
                 "bid_summary": {
-                    "client_name": "",
-                    "rfp_number": "",
-                    "services_required": "",
-                    "client_contact": "",
-                    "email": "",
-                    "incumbent": ""
+                    "client_name": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    },
+                    "rfp_number": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    },
+                    "services_required": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    },
+                    "client_contact": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    },
+                    "email": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    },
+                    "incumbent": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    }
                 },
                 "key_dates": {
-                    "start_date": "",
-                    "submission_deadline": "",
-                    "clarifications_deadline": "",
-                    "issuance_of_response_to_bidder_questions": "",
-                    "instruction_to_clarification_question": "",
-                    "fully_executed_agreement": "",
-                    "site_visit_date": "",
-                    "contract_award_date": "",
-                    "method_of_submission": "",
-                    "submission_instructions": ""
+                    "start_date": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    },
+                    "submission_deadline": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    },
+                    "clarifications_deadline": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    },
+                    "issuance_of_response_to_bidder_questions": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    },
+                    "instruction_to_clarification_question": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    },
+                    "fully_executed_agreement": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    },
+                    "site_visit_date": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    },
+                    "contract_award_date": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    },
+                    "method_of_submission": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    },
+                    "submission_instructions": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    }
                 },
                 "work_portfolio": {
-                    "experience": "",
-                    "case_studies": "",
-                    "case_studies_specifications": "",
-                    "integration_requirements": "",
-                    "other_requirements": "",
-                    "references": ""
+                    "experience": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    },
+                    "case_studies": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    },
+                    "case_studies_specifications": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    },
+                    "integration_requirements": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    },
+                    "other_requirements": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    },
+                    "references": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    }
                 },
                 "requirements": {
-                    "confidentiality": "",
-                    "compliances": "",
-                    "security": "",
-                    "foreign_workers_limitations": "",
-                    "notary": "",
-                    "on_site_requirements": "",
-                    "resumes_required": "",
-                    "registration_requirements": "",
-                    "contract_length": "",
-                    "other_requirements": ""
+                    "confidentiality": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    },
+                    "compliances": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    },
+                    "security": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    },
+                    "foreign_workers_limitations": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    },
+                    "notary": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    },
+                    "on_site_requirements": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    },
+                    "resumes_required": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    },
+                    "registration_requirements": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    },
+                    "contract_length": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    },
+                    "other_requirements": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    }
                 },
                 "submission_details": {
-                    "method": "",
-                    "instructions": ""
+                    "method": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    },
+                    "instructions": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    }
                 },
                 "checklist": {
-                    "insurances": "",
-                    "resumes": "",
-                    "business_registrations": ""
+                    "insurances": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    },
+                    "resumes": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    },
+                    "business_registrations": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    }
                 },
                 "commercials": {
-                    "budget": "",
-                    "contract_length": "",
-                    "price_quality_ratio": ""
+                    "budget": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    },
+                    "contract_length": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    },
+                    "price_quality_ratio": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    }
                 },
                 "website_details": {
-                    "web_address": "",
-                    "current_cms": "",
-                    "preferred_cms": ""
+                    "web_address": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    },
+                    "current_cms": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    },
+                    "preferred_cms": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    }
                 },
                 "flags": {
-                    "workload_summary": "",
-                    "total_wordcount": "",
-                    "targets_provided": "",
-                    "design_required": "",
-                    "media_plan": "",
-                    "pricing_summary": "",
-                    "notes": ""
-                }
-                "further_details": {
-                    "Undergraduate": "",
-                    "Postgraduate": "",
-                    "Research: "",
-                    "Qualifications": "",
-                    "Apprenticeships": "",
-                    "International": "",
-                    "Digital": "",
-                    "Creative": "",
-                    "Media": "",
-                    "Offline": "",
-                    
+                    "workload_summary": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    },
+                    "total_wordcount": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    },
+                    "targets_provided": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    },
+                    "design_required": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    },
+                    "media_plan": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    },
+                    "pricing_summary": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    },
+                    "notes": {
+                        "value": "",
+                        "confidence": 0.0,
+                        "is_interpreted": false
+                    }
                 }
             }
+
+            For each field:
+            1. Set "value" to the extracted information from the RFP
+            2. Set "confidence" to a value between 0.0 and 1.0 indicating your confidence in the extraction
+            3. Set "is_interpreted" to true if you had to interpret or infer the information rather than directly extract it
+            
+            If information is explicitly stated in the RFP, set confidence high (0.8-1.0) and is_interpreted to false.
+            If information is implied but not explicitly stated, provide your best interpretation, set confidence lower (0.4-0.7), and set is_interpreted to true.
+            If you're making an educated guess based on context, set confidence even lower (0.1-0.3) and set is_interpreted to true.
+            If information is completely absent, leave value as empty string, set confidence to 0.0, and is_interpreted to false.
+            
+            For example:
+            - If the RFP clearly states "Budget: $500,000", set {"value": "$500,000", "confidence": 1.0, "is_interpreted": false}
+            - If the RFP mentions "work must be completed within 12 months" but doesn't explicitly state contract length, set {"value": "12 months", "confidence": 0.6, "is_interpreted": true}
+            - If there's no mention of the incumbent, leave as {"value": "", "confidence": 0.0, "is_interpreted": false}
             """
 
             # First, get the embedding for our query text
@@ -221,6 +454,15 @@ class RFPAnalyzer:
     async def generate_bid_matrix(self, rfp_info: Dict) -> Dict[str, Any]:
         """Generate a detailed bid matrix from RFP information"""
         try:
+            # Extract values from the new nested structure
+            def get_value(section, key):
+                if section in rfp_info and key in rfp_info[section]:
+                    item = rfp_info[section][key]
+                    if isinstance(item, dict) and "value" in item:
+                        return item["value"]
+                    return item  # For backward compatibility
+                return "Not specified"
+            
             matrix = {
                 "sections": [
                     {
@@ -228,14 +470,14 @@ class RFPAnalyzer:
                         "items": [
                             {
                                 "category": "Budget",
-                                "requirement": rfp_info.get("commercials", {}).get("budget", "Not specified"),
+                                "requirement": get_value("commercials", "budget"),
                                 "priority": "High",
                                 "status": "To Review",
                                 "notes": "Compare with past successful bids in this range"
                             },
                             {
                                 "category": "Deadline",
-                                "requirement": rfp_info.get("key_dates", {}).get("submission_deadline", "Not specified"),
+                                "requirement": get_value("key_dates", "submission_deadline"),
                                 "priority": "High",
                                 "status": "To Review",
                                 "notes": "Assess resource availability for timeline"
