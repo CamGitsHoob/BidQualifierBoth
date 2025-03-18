@@ -1,0 +1,43 @@
+# Python virtual environment
+venv/
+env/
+ENV/
+*.pyc
+__pycache__/
+
+# Node modules and build
+node_modules/
+.next/
+build/
+dist/
+
+# PyTorch and other large packages
+*.dylib
+*.so
+*.dll
+*.pyd
+
+# Environment variables
+.env
+.env.local
+.env.*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+rfp_documents/
+logs/
+*.log
+
+# Large model files
+*.pt
+*.pth
+*.onnx 
