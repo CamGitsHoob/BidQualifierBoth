@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useEffect, useState, useRef } from 'react'
+import { useParams, useRouter } from 'next/navigation'
 import ChatPopup from '@/components/ChatPopup'
 import { LoadingState } from '@/components/LoadingState'
 
@@ -84,6 +84,11 @@ interface RFPData {
 }
 
 const renderDataItem = (item: any, label: string, showInterpreted: boolean, confidenceThreshold: number) => {
+  // If the item is empty or undefined, show a placeholder
+  if (!item || !item.value) {
+    return <dd className="mt-1 text-sm text-gray-400 italic">No data available</dd>;
+  }
+  
   // Handle the new data structure with confidence
   if (item && typeof item === 'object' && 'value' in item) {
     const { value, confidence, is_interpreted } = item;
@@ -144,7 +149,12 @@ export default function AnalysisPage() {
   const [similarityScore, setSimilarityScore] = useState<number | null>(null)
   const [showInterpreted, setShowInterpreted] = useState(true)
   const [confidenceThreshold, setConfidenceThreshold] = useState(0)
+  const [isChatOpen, setIsChatOpen] = useState(false)
   const params = useParams()
+  const router = useRouter()
+  
+  // Add a ref to the ChatPopup component
+  const chatPopupRef = useRef(null)
 
   const renderFilterControls = () => (
     <div className="bg-white rounded-lg shadow-lg overflow-hidden mb-8">
@@ -166,20 +176,27 @@ export default function AnalysisPage() {
         </div>
         
         <div className="w-64">
-          <label htmlFor="confidence" className="block text-sm font-medium text-gray-700">
+          <label htmlFor="confidence" className="block text-sm font-medium text-gray-700 mb-1">
             Minimum confidence:
           </label>
-          <select
-            id="confidence"
-            value={confidenceThreshold}
-            onChange={(e) => setConfidenceThreshold(parseFloat(e.target.value))}
-            className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
-          >
-            <option value={0}>Show all</option>
-            <option value={0.3}>Low confidence (30%+)</option>
-            <option value={0.5}>Medium confidence (50%+)</option>
-            <option value={0.7}>High confidence (70%+)</option>
-          </select>
+          <div className="relative">
+            <select
+              id="confidence"
+              value={confidenceThreshold}
+              onChange={(e) => setConfidenceThreshold(parseFloat(e.target.value))}
+              className="block w-full pl-3 pr-10 py-2 text-base border border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md appearance-none bg-white"
+            >
+              <option value={0}>Show all</option>
+              <option value={0.3}>Low confidence (30%+)</option>
+              <option value={0.5}>Medium confidence (50%+)</option>
+              <option value={0.7}>High confidence (70%+)</option>
+            </select>
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+              <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -188,47 +205,58 @@ export default function AnalysisPage() {
   useEffect(() => {
     const fetchAnalysis = async () => {
       try {
-        const sampleText = `Request for Proposal (RFP)
-        Company: TechCorp Solutions
-        Budget: $500,000
-        Deadline: December 31, 2024
+        // Get the session ID from localStorage
+        const sessionId = localStorage.getItem('rfpSessionId');
         
-        We are seeking proposals for implementing an enterprise-wide CRM solution.
-        Key requirements include Salesforce integration, data migration, and staff training.`
-
-        // Log what we're sending
-        console.log('Sending request with:', { text: sampleText });
-
+        if (!sessionId) {
+          console.error('No session ID found in localStorage');
+          setError('No session ID found. Please upload a document first.');
+          return;
+        }
+        
+        console.log('Fetching analysis with session ID:', sessionId);
+        
         const response = await fetch('http://localhost:8000/api/rfp/analyze/', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          mode: 'cors',
           body: JSON.stringify({ 
-            rfp_text: sampleText  // Changed from 'text' to 'rfp_text'
+            session_id: sessionId
           })
         });
-
+        
         if (!response.ok) {
-          // Log the error response
           const errorText = await response.text();
-          console.error('Error response:', errorText);
-          throw new Error(`Failed to fetch analysis: ${errorText}`);
+          console.error('Analysis error:', errorText);
+          throw new Error('Analysis failed: ' + errorText);
         }
-
-        const data = await response.json();
-        console.log('Received data:', data);
-        setRfpData(data.result);
+        
+        const analysisData = await response.json();
+        console.log('Analysis data:', analysisData);
+        
+        if (!analysisData.success) {
+          throw new Error(analysisData.error || 'Analysis failed');
+        }
+        
+        // Transform the analysis data to match your RFPData interface
+        const transformedData = {
+          ...analysisData.result,
+          sections: [] // Add empty sections array to match interface
+        };
+        
+        setRfpData(transformedData);
+        setIsLoading(false);
+        
       } catch (err) {
-        console.error('Full error:', err);
-        setError(err instanceof Error ? err.message : 'An error occurred');
-      } finally {
+        console.error('Error fetching analysis:', err);
+        setError(err.message || 'Failed to analyze RFP');
         setIsLoading(false);
       }
     };
+    
     fetchAnalysis();
-  }, [params.id]);
+  }, []);
 
   useEffect(() => {
     const fetchSimilarityScore = async () => {
@@ -264,6 +292,38 @@ export default function AnalysisPage() {
     fetchSimilarityScore();
   }, []);
 
+  useEffect(() => {
+    // Set up cleanup timer
+    const cleanupTimeout = setTimeout(() => {
+      const cleanupSession = async () => {
+        const sessionId = localStorage.getItem('rfpSessionId');
+        if (sessionId) {
+          try {
+            console.log('Cleaning up session after 30 minutes:', sessionId);
+            await fetch('http://localhost:8000/api/rfp/cleanup-session/', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ 
+                session_id: sessionId
+              })
+            });
+            // Don't remove from localStorage if the user is still using the app
+            // localStorage.removeItem('rfpSessionId');
+          } catch (error) {
+            console.error('Error cleaning up session:', error);
+          }
+        }
+      };
+      
+      cleanupSession();
+    }, 30 * 60 * 1000); // 30 minutes in milliseconds
+    
+    // Clean up the timeout when component unmounts
+    return () => clearTimeout(cleanupTimeout);
+  }, []);
+
   const handleDownloadReport = async () => {
     try {
       const response = await fetch('http://localhost:8000/api/rfp/download-report/', {
@@ -287,6 +347,32 @@ export default function AnalysisPage() {
       document.body.removeChild(a);
     } catch (error) {
       console.error('Error downloading report:', error);
+    }
+  };
+
+  const handleEndSession = async () => {
+    const sessionId = localStorage.getItem('rfpSessionId');
+    if (sessionId) {
+      try {
+        setIsLoading(true);
+        await fetch('http://localhost:8000/api/rfp/cleanup-session/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            session_id: sessionId
+          })
+        });
+        localStorage.removeItem('rfpSessionId');
+        // Redirect to home page or show success message
+        router.push('/');
+      } catch (error) {
+        console.error('Error cleaning up session:', error);
+        setError('Failed to end session');
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -384,30 +470,30 @@ export default function AnalysisPage() {
               </div>
             </div>
 
-            {/* Add this right after the similarity score section */}
+            {/* Data Confidence Legend */}
             <div className="bg-white rounded-lg shadow-lg overflow-hidden mb-8">
               <div className="bg-gray-50 px-6 py-4">
                 <h2 className="text-xl font-semibold text-gray-900">Data Confidence Legend</h2>
               </div>
               <div className="p-6">
-                <div className="flex flex-wrap gap-4">
+                <div className="flex flex-wrap gap-6">
                   <div className="flex items-center">
-                    <div className="w-4 h-4 bg-green-100 rounded mr-2"></div>
-                    <span className="text-sm">High confidence (80-100%)</span>
+                    <div className="w-5 h-5 bg-green-100 rounded mr-3"></div>
+                    <span className="text-sm font-medium text-gray-900">High confidence (80-100%)</span>
                   </div>
                   <div className="flex items-center">
-                    <div className="w-4 h-4 bg-yellow-100 rounded mr-2"></div>
-                    <span className="text-sm">Medium confidence (50-80%)</span>
+                    <div className="w-5 h-5 bg-yellow-100 rounded mr-3"></div>
+                    <span className="text-sm font-medium text-gray-900">Medium confidence (50-80%)</span>
                   </div>
                   <div className="flex items-center">
-                    <div className="w-4 h-4 bg-red-100 rounded mr-2"></div>
-                    <span className="text-sm">Low confidence (1-50%)</span>
+                    <div className="w-5 h-5 bg-red-100 rounded mr-3"></div>
+                    <span className="text-sm font-medium text-gray-900">Low confidence (1-50%)</span>
                   </div>
                   <div className="flex items-center">
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 mr-2">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 mr-3">
                       Interpreted
                     </span>
-                    <span className="text-sm">AI interpretation (not directly stated in RFP)</span>
+                    <span className="text-sm font-medium text-gray-900">AI interpretation (not directly stated in RFP)</span>
                   </div>
                 </div>
               </div>
@@ -558,7 +644,11 @@ export default function AnalysisPage() {
           </>
         )}
         
-        <ChatPopup />
+        <ChatPopup 
+          isOpen={isChatOpen} 
+          setIsOpen={setIsChatOpen} 
+          ref={chatPopupRef} 
+        />
       </div>
     </div>
   )

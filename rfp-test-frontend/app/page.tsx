@@ -38,13 +38,15 @@ export default function BidQualifierPage() {
     formData.append('file', file)
 
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/rfp/upload_pdf/', {
+      const response = await fetch('http://localhost:8000/api/rfp/analyze-pdf/', {
         method: 'POST',
         body: formData,
       })
 
       if (!response.ok) {
-        throw new Error('Upload failed')
+        const errorText = await response.text();
+        console.error('Upload error:', errorText);
+        throw new Error('Upload failed: ' + errorText);
       }
 
       const data = await response.json()
@@ -52,6 +54,9 @@ export default function BidQualifierPage() {
       if (data.success) {
         setIsFileUploaded(true)
         setFile(file)
+        if (data.session_id) {
+          localStorage.setItem('rfpSessionId', data.session_id);
+        }
       }
     } catch (error) {
       console.error('Error:', error)

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, forwardRef, useImperativeHandle } from 'react'
 import { ChatBubbleLeftIcon, XMarkIcon, PaperAirplaneIcon } from '@heroicons/react/24/outline'
 
 interface ChatMessage {
@@ -8,8 +8,16 @@ interface ChatMessage {
   content: string
 }
 
-export default function ChatPopup() {
-  const [isOpen, setIsOpen] = useState(false)
+interface ChatPopupProps {
+  isOpen?: boolean;
+  setIsOpen?: (isOpen: boolean) => void;
+}
+
+const ChatPopup = forwardRef(function ChatPopup(
+  { isOpen: propIsOpen, setIsOpen: propSetIsOpen }: ChatPopupProps, 
+  ref
+) {
+  const [isOpen, setIsOpenState] = useState(propIsOpen || false)
   const [message, setMessage] = useState('')
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([
     // Welcome message with example prompts below it
@@ -23,6 +31,17 @@ Example questions you can ask:
     }
   ])
   const [isLoading, setIsLoading] = useState(false)
+
+  // Use either the prop state or local state
+  const chatIsOpen = propIsOpen !== undefined ? propIsOpen : isOpen;
+  const setChatIsOpen = propSetIsOpen || setIsOpenState;
+
+  // Expose methods to parent component
+  useImperativeHandle(ref, () => ({
+    open: () => setChatIsOpen(true),
+    close: () => setChatIsOpen(false),
+    toggle: () => setChatIsOpen(!chatIsOpen)
+  }));
 
   // Add preset prompts
   const presetPrompts = [
@@ -87,10 +106,10 @@ Example questions you can ask:
   }
 
   return (
-    <>
+    <div className={`fixed bottom-4 right-4 z-50 ${chatIsOpen ? 'w-96' : 'w-auto'}`}>
       {/* Chat Icon Button with Loading Spinner */}
       <button
-        onClick={() => setIsOpen(true)}
+        onClick={() => setChatIsOpen(true)}
         className="fixed bottom-5 right-5 p-3 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-lg"
       >
         {isLoading ? (
@@ -101,12 +120,12 @@ Example questions you can ask:
       </button>
 
       {/* Chat Popup */}
-      {isOpen && (
+      {chatIsOpen && (
         <div className="fixed bottom-20 right-5 w-[350px] h-[500px] bg-white rounded-lg shadow-xl flex flex-col overflow-hidden">
           {/* Header */}
           <div className="p-4 bg-blue-500 text-white flex justify-between items-center">
             <h3 className="font-semibold">RFP Assistant</h3>
-            <button onClick={() => setIsOpen(false)} className="text-white hover:text-gray-200">
+            <button onClick={() => setChatIsOpen(false)} className="text-white hover:text-gray-200">
               <XMarkIcon className="h-6 w-6" />
             </button>
           </div>
@@ -180,6 +199,10 @@ Example questions you can ask:
           </div>
         </div>
       )}
-    </>
+    </div>
   )
-} 
+})
+
+ChatPopup.displayName = 'ChatPopup'
+
+export default ChatPopup 

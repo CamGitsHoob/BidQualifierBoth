@@ -14,44 +14,83 @@ if not PINECONE_API_KEY or not PINECONE_ENV:
     raise ValueError("Pinecone API key or environment is not set. "
                      "Please set the PINECONE_API_KEY and PINECONE_ENV environment variables.")
 
-def reset_document_store():
-    """Delete and recreate the Pinecone index"""
-    pc = Pinecone(api_key=PINECONE_API_KEY)
-    index_name = "rfpuploads"
-    dimension = 1536
-    spec = ServerlessSpec(cloud="aws", region=PINECONE_ENV)
+pc = Pinecone(api_key=os.environ.get("PINECONE_API_KEY"))
+index_name_base = "rfp-analysis"
 
-    # Delete existing index if it exists
-    try:
-        if index_name in [index_info["name"] for index_info in pc.list_indexes()]:
-            print(f"Deleting existing index '{index_name}'...")
-            pc.delete_index(index_name)
-            # Wait for deletion to complete
-            time.sleep(5)
-    except Exception as e:
-        print(f"Error deleting index: {str(e)}")
+def get_session_index_name(session_id):
+    """Generate a unique index name for a session"""
+    # Use only the first 8 characters of the UUID to keep the name short
+    short_id = session_id[:8]
+    return f"{index_name_base}-{short_id}"
 
-    # Create new index
-    print(f"Creating new index '{index_name}'...")
-    pc.create_index(name=index_name, dimension=dimension, metric="cosine", spec=spec)
+def create_session_index(session_id):
+    """Create a new index for a specific session"""
+    index_name = get_session_index_name(session_id)
+    
+    # Ensure the index name is valid for Pinecone (max 45 chars)
+    if len(index_name) > 45:
+        # Truncate if necessary
+        index_name = index_name[:45]
+    
+    # Check if the index already exists
+    if index_name not in pc.list_indexes().names():
+        # Create a new index
+        pc.create_index(
+            name=index_name,
+            dimension=1536,  # OpenAI embedding dimension
+            metric="cosine",
+            spec=ServerlessSpec(cloud="aws", region="us-west-2")
+        )
+    
+    # Return the index
+    return pc.Index(index_name)
 
-    # Wait for index to be ready
-    while True:
-        try:
-            status = pc.describe_index(index_name).status
-            if status.get('ready'):
-                break
-            print("Waiting for index to be ready...")
-            time.sleep(2)
-        except Exception as e:
-            print(f"Error checking index status: {str(e)}")
-            time.sleep(2)
+def get_document_store(session_id=None):
+    """Get or create a document store for a specific session"""
+    if session_id:
+        index = create_session_index(session_id)
+        index_name = get_session_index_name(session_id)
+        return PineconeDocumentStore(
+            index=index_name,
+        )
+    else:
+        # Default index for backward compatibility
+        index_name = "rfp-analysis"
+        if index_name not in pc.list_indexes().names():
+            pc.create_index(
+                name=index_name,
+                dimension=1536,
+                metric="cosine",
+                spec=ServerlessSpec(cloud="aws", region="us-west-2")
+            )
+        return PineconeDocumentStore(
+            index=index_name,
+        )
 
-    print(f"Index '{index_name}' is ready.")
+def reset_document_store(session_id=None):
+    """Reset a document store for a specific session"""
+    index_name = get_session_index_name(session_id) if session_id else "rfp-analysis"
+    
+    # Delete the index if it exists
+    if index_name in pc.list_indexes().names():
+        pc.delete_index(index_name)
+    
+    # Create a new index
+    pc.create_index(
+        name=index_name,
+        dimension=1536,
+        metric="cosine",
+        spec=ServerlessSpec(cloud="aws", region="us-west-2")
+    )
+    
+    # Return a new document store
+    from haystack_integrations.document_stores.pinecone import PineconeDocumentStore
     return PineconeDocumentStore(
         index=index_name,
-        metric="cosine"
     )
+
+# Create a default document store
+document_store = get_document_store()
 
 # Create a Pinecone client instance using the new API
 pc = Pinecone(api_key=PINECONE_API_KEY)

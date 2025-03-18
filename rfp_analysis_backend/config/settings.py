@@ -75,3 +75,10 @@ DATABASES = {
     }
 }
 
+# Add this to your settings
+PROTECTED_INDEXES = [
+    "rfp-analysis",
+    "rfpuploads",
+    # Add any other static indexes here
+]
+

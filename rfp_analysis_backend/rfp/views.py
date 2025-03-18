@@ -10,7 +10,7 @@ from haystack import Document
 from haystack.components.preprocessors import DocumentSplitter
 from haystack.components.embedders import OpenAIDocumentEmbedder
 from haystack.utils import Secret
-from pinecone_store import document_store
+from pinecone_store import document_store, get_document_store, reset_document_store
 from .rfp_analyzer import RFPAnalyzer
 from asgiref.sync import async_to_sync
 from .rfp_chatbot import RFPChatbot
@@ -22,7 +22,8 @@ from pinecone_store import Pinecone
 import numpy as np
 from openpyxl import Workbook
 from datetime import datetime
-from pinecone_store import reset_document_store
+from pinecone_store import get_session_index_name, pc
+from django.conf import settings
 
 # Create a global analyzer instance using our Pinecone document store.
 analyzer = RFPAnalyzer(vector_store=document_store)
@@ -32,6 +33,14 @@ def extract_text_from_pdf(file_path):
     Extract text from a PDF file.
     """
     try:
+        # Check if the file exists at the given path
+        if not os.path.exists(file_path):
+            # Try to get the absolute path using default_storage
+            absolute_path = default_storage.path(file_path)
+            if not os.path.exists(absolute_path):
+                raise FileNotFoundError(f"File not found at {file_path} or {absolute_path}")
+            file_path = absolute_path
+        
         with open(file_path, "rb") as f:
             reader = PdfReader(f)
             extracted_text = "\n".join(
@@ -122,45 +131,63 @@ def upload_pdf(request):
         }, status=500)
 
 @api_view(["POST"])
+@parser_classes([MultiPartParser])
 def analyze_pdf(request):
-    """
-    Second step: Process and index the PDF in Pinecone.
-    """ 
+    """Process and index the PDF in Pinecone."""
     try:
-        # Reset the document store before processing
-        global document_store
-        document_store = reset_document_store()
-
-        # Get the latest uploaded file
-        file_path = request.data.get('file_path')
-        if not file_path:
-            return JsonResponse({"error": "No file path provided"}, status=400)
+        print("analyze_pdf view called")
+        print("Request data:", request.data)
+        print("Request FILES:", request.FILES)
+        
+        # Generate a session ID if not provided
+        session_id = request.data.get('session_id')
+        if not session_id:
+            session_id = str(uuid.uuid4())
+            print(f"Generated new session ID: {session_id}")
+        
+        # Get the file from the request
+        if 'file' not in request.FILES:
+            print("No file in request.FILES")
+            return JsonResponse({"error": "No file provided"}, status=400)
+        
+        uploaded_file = request.FILES['file']
+        print(f"Received file: {uploaded_file.name}, size: {uploaded_file.size}")
+        
+        # Save the file temporarily
+        file_path = default_storage.save(f"uploads/{uploaded_file.name}", ContentFile(uploaded_file.read()))
+        print(f"Saved file to: {file_path}")
+        
+        # Get the absolute path to the file
+        absolute_file_path = default_storage.path(file_path)
+        print(f"Absolute file path: {absolute_file_path}")
+        
+        # Reset the document store for this session
+        document_store = reset_document_store(session_id)
+        print(f"Reset document store for session: {session_id}")
 
         # Extract and process the PDF
-        extracted_text = extract_text_from_pdf(file_path)
+        extracted_text = extract_text_from_pdf(absolute_file_path)
+        print(f"Extracted text length: {len(extracted_text)}")
         
         # Split into chunks and embed
         splitter = DocumentSplitter(split_by="sentence", split_length=3, split_overlap=1)
+        # Warm up the splitter before using it
+        splitter.warm_up()
+        
         docs = [Document(content=extracted_text)]
         split_docs = splitter.run(docs)["documents"]
 
         # Get OpenAI API key
-        openai_api_key = os.environ.get("OPENAI_API_KEY")
-        if not openai_api_key:
-            return JsonResponse(
-                {"error": "OPENAI_API_KEY environment variable is not set."},
-                status=500,
-            )
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            return JsonResponse({"error": "OpenAI API key not found"}, status=500)
 
-        # Embed documents
-        document_embedder = OpenAIDocumentEmbedder(
-            api_key=Secret.from_token(openai_api_key),
-            model="text-embedding-ada-002"
-        )
-        embedding_results = document_embedder.run(split_docs)
-        embedded_docs = embedding_results["documents"]
+        # Embed the documents
+        embedder = OpenAIDocumentEmbedder(api_key=Secret.from_token(api_key))
+        
+        embedded_docs = embedder.run(split_docs)["documents"]
 
-        # Index documents
+        # Write to Pinecone
         document_store.write_documents(embedded_docs)
 
         # Clean up the temporary file
@@ -168,28 +195,45 @@ def analyze_pdf(request):
 
         return JsonResponse({
             "success": True,
-            "message": "Document analyzed and indexed successfully"
+            "message": "Document analyzed and indexed successfully",
+            "session_id": session_id
         })
 
     except Exception as e:
+        import traceback
+        print(f"Error in analyze_pdf: {str(e)}")
+        print(traceback.format_exc())
         return JsonResponse({
             "error": f"Analysis failed: {str(e)}"
         }, status=500)
 
 @api_view(["POST"])
 def analyze_rfp(request):
-    """
-    Second step: Analyze the RFP using the indexed documents.
-    """
+    """Analyze the RFP using the indexed documents."""
     try:
+        # Get the session ID
+        session_id = request.data.get('session_id')
+        
+        # Get the document store for this session
+        document_store = get_document_store(session_id)
+        
+        # Create an analyzer with the session-specific document store
+        analyzer = RFPAnalyzer(vector_store=document_store)
+
+        
         # Use the analyzer to analyze the indexed documents
-        result = async_to_sync(analyzer.analyze_rfp)("", "")  # No need for text/path as docs are indexed
+        result = async_to_sync(analyzer.analyze_rfp)("", "")
+        
         return JsonResponse({
             "success": True,
-            "result": result
+            "result": result,
+            "session_id": session_id
         })
 
     except Exception as e:
+        import traceback
+        print(f"Error in analyze_rfp: {str(e)}")
+        print(traceback.format_exc())
         return JsonResponse({
             "error": f"Analysis failed: {str(e)}"
         }, status=500)
@@ -415,4 +459,47 @@ def download_report(request):
         return JsonResponse({
             'success': False,
             'error': str(e)
+        }, status=500)
+
+@api_view(["POST"])
+def cleanup_session(request):
+    """Clean up a session's resources."""
+    try:
+        session_id = request.data.get('session_id')
+        if not session_id:
+            return JsonResponse({"error": "No session ID provided"}, status=400)
+        
+        # Get the index name for this session
+        index_name = get_session_index_name(session_id)
+        
+        # SAFETY CHECK: Only delete if it's a session index
+        # This prevents deletion of static indexes
+        if index_name.startswith(f"{index_name_base}-") and index_name != index_name_base:
+            if index_name in pc.list_indexes().names():
+                # Check if the index is protected
+                if index_name in getattr(settings, 'PROTECTED_INDEXES', []):
+                    return JsonResponse({
+                        "error": "Cannot delete protected index",
+                        "message": f"Index {index_name} is protected"
+                    }, status=403)
+                else:
+                    pc.delete_index(index_name)
+                    return JsonResponse({
+                        "success": True,
+                        "message": f"Session {session_id} cleaned up successfully"
+                    })
+            else:
+                return JsonResponse({
+                    "success": True,
+                    "message": f"No index found for session {session_id}"
+                })
+        else:
+            return JsonResponse({
+                "error": "Cannot delete non-session index",
+                "message": f"Index {index_name} appears to be a static index"
+            }, status=403)
+            
+    except Exception as e:
+        return JsonResponse({
+            "error": f"Failed to clean up session: {str(e)}"
         }, status=500)
