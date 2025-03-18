@@ -79,6 +79,6 @@ DATABASES = {
 PROTECTED_INDEXES = [
     "rfp-analysis",
     "rfpuploads",
-    # Add any other static indexes here
+    "paidmediabids"
 ]
 

@@ -22,7 +22,7 @@ from pinecone_store import Pinecone
 import numpy as np
 from openpyxl import Workbook
 from datetime import datetime
-from pinecone_store import get_session_index_name, pc
+from pinecone_store import get_session_index_name, pc, index_name_base
 from django.conf import settings
 
 # Create a global analyzer instance using our Pinecone document store.
@@ -471,35 +471,52 @@ def cleanup_session(request):
         
         # Get the index name for this session
         index_name = get_session_index_name(session_id)
+        print(f"Cleaning up session {session_id}, index name: {index_name}")
         
         # SAFETY CHECK: Only delete if it's a session index
         # This prevents deletion of static indexes
         if index_name.startswith(f"{index_name_base}-") and index_name != index_name_base:
-            if index_name in pc.list_indexes().names():
+            print(f"Index {index_name} is a session index, checking if it exists...")
+            
+            # List all indexes to check if this one exists
+            existing_indexes = pc.list_indexes().names()
+            print(f"Existing indexes: {existing_indexes}")
+            
+            if index_name in existing_indexes:
                 # Check if the index is protected
-                if index_name in getattr(settings, 'PROTECTED_INDEXES', []):
+                protected_indexes = getattr(settings, 'PROTECTED_INDEXES', [])
+                print(f"Protected indexes: {protected_indexes}")
+                
+                if index_name in protected_indexes:
+                    print(f"Index {index_name} is protected, not deleting")
                     return JsonResponse({
                         "error": "Cannot delete protected index",
                         "message": f"Index {index_name} is protected"
                     }, status=403)
                 else:
+                    print(f"Deleting index {index_name}")
                     pc.delete_index(index_name)
                     return JsonResponse({
                         "success": True,
                         "message": f"Session {session_id} cleaned up successfully"
                     })
             else:
+                print(f"Index {index_name} not found in existing indexes")
                 return JsonResponse({
                     "success": True,
                     "message": f"No index found for session {session_id}"
                 })
         else:
+            print(f"Index {index_name} is not a session index, not deleting")
             return JsonResponse({
                 "error": "Cannot delete non-session index",
                 "message": f"Index {index_name} appears to be a static index"
             }, status=403)
             
     except Exception as e:
+        import traceback
+        print(f"Error in cleanup_session: {str(e)}")
+        print(traceback.format_exc())
         return JsonResponse({
             "error": f"Failed to clean up session: {str(e)}"
         }, status=500)
