@@ -6,7 +6,7 @@ from django.http import JsonResponse, HttpResponse
 from rest_framework.decorators import api_view, parser_classes
 from rest_framework.parsers import MultiPartParser
 from PyPDF2 import PdfReader
-from haystack.dataclasses import Document
+from haystack import Document
 from haystack.components.preprocessors import DocumentSplitter
 from haystack.components.embedders import OpenAIDocumentEmbedder
 from haystack.utils import Secret
@@ -23,14 +23,9 @@ import numpy as np
 from openpyxl import Workbook
 from datetime import datetime
 from pinecone_store import reset_document_store
-from .utils import write_documents_with_retry
-import logging
-from haystack_integrations.document_stores.pinecone import PineconeDocumentStore
-
-logger = logging.getLogger(__name__)
 
 # Create a global analyzer instance using our Pinecone document store.
-analyzer = RFPAnalyzer(vector_store=reset_document_store())
+analyzer = RFPAnalyzer(vector_store=document_store)
 
 def extract_text_from_pdf(file_path):
     """
@@ -52,88 +47,40 @@ def extract_text_from_pdf(file_path):
 @api_view(["POST"])
 @parser_classes([MultiPartParser])
 def upload_pdf(request):
-    """Upload PDF, extract text, create embeddings, and store in Pinecone"""
+    """
+    Upload an RFP PDF file, extract text, split it into chunks,
+    compute 1536-d OpenAI embeddings, and index them into Pinecone.
+    """
     try:
-        # 1. Get and validate file
         file = request.FILES.get("file")
         if not file or not file.name.endswith(".pdf"):
             return JsonResponse({"error": "Invalid file"}, status=400)
 
-        print("File received:", file.name)  # Debug log
-
-        # 2. Save file temporarily
-        file_path = default_storage.save(f"rfp_documents/{file.name}", ContentFile(file.read()))
-        print("File saved at:", file_path)  # Debug log
-
-        # 3. Extract text
-        with open(default_storage.path(file_path), "rb") as f:
-            reader = PdfReader(f)
-            text = "\n".join(page.extract_text() for page in reader.pages)
-        print("Text extracted, length:", len(text))  # Debug log
-
-        # 4. Split into chunks
-        splitter = DocumentSplitter(split_by="sentence", split_length=3, split_overlap=1)
-        splitter.warm_up()
-        docs = [Document(content=text)]
-        split_docs = splitter.run(docs)["documents"]
-        print("Split into chunks:", len(split_docs))  # Debug log
-
-        # 5. Create embeddings
-        embedder = OpenAIDocumentEmbedder(
-            api_key=Secret.from_token(os.environ.get("OPENAI_API_KEY")),
-            model="text-embedding-ada-002"
-        )
-        embedded_docs = embedder.run(split_docs)["documents"]
-        print("Created embeddings:", len(embedded_docs))  # Debug log
-
-        # 6. Store in Pinecone - with updated parameters
-        document_store = PineconeDocumentStore(
-            api_key=os.environ.get("PINECONE_API_KEY"),
-            index_name="rfpuploads",
-            dimension=1536,
-            metric="cosine"  # Use metric instead of environment
-        )
-        document_store.write_documents(embedded_docs)
-        print("Documents written to Pinecone")  # Debug log
-
-        # 7. Clean up
-        default_storage.delete(file_path)
-
-        return JsonResponse({
-            "success": True,
-            "message": f"Processed {len(embedded_docs)} document chunks"
-        })
-
-    except Exception as e:
-        print(f"Error: {str(e)}")
-        import traceback
-        print(traceback.format_exc())  # Print full stack trace
-        return JsonResponse({"error": str(e)}, status=500)
-
-@api_view(["POST"])
-def analyze_pdf(request):
-    """
-    Second step: Process and index the PDF in Pinecone.
-    """ 
-    try:
-        
+        # Reset the document store for new upload
+        print("Resetting document store")
         global document_store
         document_store = reset_document_store()
 
-        
-        file_path = request.data.get('file_path')
-        if not file_path:
-            return JsonResponse({"error": "No file path provided"}, status=400)
+        # Generate a unique identifier for this document
+        unique_id = str(uuid.uuid4())
+        file_path = f"rfp_documents/{unique_id}_{file.name}"
+        file_name = default_storage.save(file_path, ContentFile(file.read()))
+        print(f"Saved PDF at: {default_storage.path(file_name)}")
 
-        
-        extracted_text = extract_text_from_pdf(file_path)
-        
-        
+        # Extract text from the PDF
+        try:
+            extracted_text = extract_text_from_pdf(default_storage.path(file_name))
+        except Exception as e:
+            return JsonResponse({"error": f"Failed to read PDF: {str(e)}"}, status=500)
+
+        # Split the text into document chunks
         splitter = DocumentSplitter(split_by="sentence", split_length=3, split_overlap=1)
+        splitter.warm_up()
         docs = [Document(content=extracted_text)]
         split_docs = splitter.run(docs)["documents"]
+        print(f"Split into {len(split_docs)} document chunks")
 
-        
+        # Get OpenAI API key
         openai_api_key = os.environ.get("OPENAI_API_KEY")
         if not openai_api_key:
             return JsonResponse(
@@ -141,7 +88,7 @@ def analyze_pdf(request):
                 status=500,
             )
 
-        
+        # Embed documents
         document_embedder = OpenAIDocumentEmbedder(
             api_key=Secret.from_token(openai_api_key),
             model="text-embedding-ada-002"
@@ -149,10 +96,74 @@ def analyze_pdf(request):
         embedding_results = document_embedder.run(split_docs)
         embedded_docs = embedding_results["documents"]
 
+        # Debug: Log embedding dimensions
+        for i, doc in enumerate(embedded_docs):
+            if doc.embedding:
+                print(f"Document {i} embedding dimension: {len(doc.embedding)}")
+            else:
+                print(f"Document {i} has no embedding.")
+
+        # Index documents
+        document_store.write_documents(embedded_docs)
+        print("Documents written to Pinecone document store.")
+
+        # Clean up the file after processing
+        default_storage.delete(file_name)
+
+        return JsonResponse({
+            "success": True,
+            "message": "File uploaded and processed successfully"
+        })
+
+    except Exception as e:
+        print(f"Error in upload_pdf: {str(e)}")
+        return JsonResponse({
+            "error": f"Upload failed: {str(e)}"
+        }, status=500)
+
+@api_view(["POST"])
+def analyze_pdf(request):
+    """
+    Second step: Process and index the PDF in Pinecone.
+    """ 
+    try:
+        # Reset the document store before processing
+        global document_store
+        document_store = reset_document_store()
+
+        # Get the latest uploaded file
+        file_path = request.data.get('file_path')
+        if not file_path:
+            return JsonResponse({"error": "No file path provided"}, status=400)
+
+        # Extract and process the PDF
+        extracted_text = extract_text_from_pdf(file_path)
         
+        # Split into chunks and embed
+        splitter = DocumentSplitter(split_by="sentence", split_length=3, split_overlap=1)
+        docs = [Document(content=extracted_text)]
+        split_docs = splitter.run(docs)["documents"]
+
+        # Get OpenAI API key
+        openai_api_key = os.environ.get("OPENAI_API_KEY")
+        if not openai_api_key:
+            return JsonResponse(
+                {"error": "OPENAI_API_KEY environment variable is not set."},
+                status=500,
+            )
+
+        # Embed documents
+        document_embedder = OpenAIDocumentEmbedder(
+            api_key=Secret.from_token(openai_api_key),
+            model="text-embedding-ada-002"
+        )
+        embedding_results = document_embedder.run(split_docs)
+        embedded_docs = embedding_results["documents"]
+
+        # Index documents
         document_store.write_documents(embedded_docs)
 
-        
+        # Clean up the temporary file
         default_storage.delete(file_path)
 
         return JsonResponse({
@@ -168,61 +179,19 @@ def analyze_pdf(request):
 @api_view(["POST"])
 def analyze_rfp(request):
     """
-    Analyze the RFP using the indexed documents.
+    Second step: Analyze the RFP using the indexed documents.
     """
     try:
-        print("Verifying document availability...")
-        
-        # Check document count first
-        doc_count = document_store.count_documents()
-        print(f"Documents in store: {doc_count}")
-        
-        if doc_count == 0:
-            return JsonResponse({
-                "error": "No documents found in index. Please ensure document upload is complete.",
-                "success": False
-            }, status=400)
-
-        # Create embedder for test query
-        embedder = OpenAIDocumentEmbedder(
-            api_key=Secret.from_token(os.environ.get("OPENAI_API_KEY")),
-            model="text-embedding-ada-002"
-        )
-        
-        # Create test query
-        test_docs = [Document(content="test")]
-        embedded_docs = embedder.run(test_docs)["documents"]
-        test_embedding = embedded_docs[0].embedding
-        
-        # Query using filter_documents
-        test_results = document_store.filter_documents(
-            filters={},  # No filters
-            top_k=1,
-            embedding=test_embedding
-        )
-        
-        print(f"Verification query returned {len(test_results)} documents")
-        
-        if not test_results:
-            return JsonResponse({
-                "error": "Documents are not yet queryable. Please try again in a moment.",
-                "success": False
-            }, status=400)
-
-        # Proceed with analysis
-        result = async_to_sync(analyzer.analyze_rfp)("", "")
+        # Use the analyzer to analyze the indexed documents
+        result = async_to_sync(analyzer.analyze_rfp)("", "")  # No need for text/path as docs are indexed
         return JsonResponse({
             "success": True,
             "result": result
         })
 
     except Exception as e:
-        print(f"Analysis failed: {str(e)}")
-        import traceback
-        print(traceback.format_exc())
         return JsonResponse({
-            "error": f"Analysis failed: {str(e)}",
-            "success": False
+            "error": f"Analysis failed: {str(e)}"
         }, status=500)
 
 @api_view(["POST"])
@@ -339,7 +308,7 @@ def compare_indexes(request):
         if rfp_response.get('matches'):
             rfp_vector = rfp_response['matches'][0]['values']
             
-            
+            # Use this vector to query uswebbid
             uswebbid_response = uswebbid.query(
                 vector=rfp_vector,
                 top_k=400,
@@ -348,7 +317,7 @@ def compare_indexes(request):
                 namespace="default"
             ).to_dict()
             
-            # Calculate average similarity score of the uploaded RFP against the uspaidmedia index
+            # Calculate average similarity score
             scores = [match['score'] for match in uswebbid_response.get('matches', [])]
             average_similarity = sum(scores) / len(scores) if scores else 0
             
@@ -370,19 +339,21 @@ def compare_indexes(request):
             'error': str(e)
         }, status=500)
 
-@api_view(["POST"])  
+@api_view(["POST"])  # Change to POST to receive data
 def download_report(request):
     """Download the RFP analysis as an Excel report."""
     try:
         print("Starting report generation...")
         
+        # Get the RFP data from the request
         rfp_data = request.data.get('rfpData', {})
-        print(f"Received RFP data: {rfp_data}")  
+        print(f"Received RFP data: {rfp_data}")  # Debug log
 
         wb = Workbook()
         ws = wb.active
         ws.title = "RFP Analysis Report"
 
+        # Add title and date
         ws['A1'] = "RFP Analysis Report"
         ws['A2'] = f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
         
@@ -394,10 +365,12 @@ def download_report(request):
         def add_section(title, data):
             nonlocal current_row
             try:
+                # Add section title
                 ws.cell(row=current_row, column=1, value=title)
                 ws.merge_cells(f'A{current_row}:F{current_row}')
                 current_row += 1
 
+                # Add data
                 if isinstance(data, dict):
                     for key, value in data.items():
                         ws.cell(row=current_row, column=1, value=str(key).replace('_', ' ').title())

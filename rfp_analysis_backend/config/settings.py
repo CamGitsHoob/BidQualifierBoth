@@ -20,7 +20,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "corsheaders",
-    "rfp", 
+    "rfp",  # Our RFP app
 ]
 
 # Middleware
@@ -29,14 +29,14 @@ MIDDLEWARE = [
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
-    "django.contrib.auth.middleware.AuthenticationMiddleware",  
-    "django.contrib.messages.middleware.MessageMiddleware",  
+    "django.contrib.auth.middleware.AuthenticationMiddleware",  # REQUIRED
+    "django.contrib.messages.middleware.MessageMiddleware",  # REQUIRED
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "corsheaders.middleware.CorsMiddleware", 
+    "corsheaders.middleware.CorsMiddleware",  # For CORS
 ]
 
 # CORS settings
-CORS_ALLOW_ALL_ORIGINS = True  
+CORS_ALLOW_ALL_ORIGINS = True  # Allow Next.js frontend to communicate
 
 # Static & media files
 STATIC_URL = "/static/"
@@ -53,7 +53,7 @@ REST_FRAMEWORK = {
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [BASE_DIR / "templates"],  
+        "DIRS": [BASE_DIR / "templates"],  # You can change this if needed
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [

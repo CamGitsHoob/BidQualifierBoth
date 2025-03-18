@@ -3,34 +3,44 @@ from pinecone import Pinecone  # Using the new Pinecone client pattern
 from openai import OpenAI
 from typing import Dict
 import numpy as np
-from pinecone_store import document_store  # Import the shared document store
 
 class RFPChatbot:
     def __init__(self):
-        self.document_store = document_store  # Use the same document store instance
+        # Initialize Pinecone with new syntax
+        pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
+        self.index = pc.Index("rfpuploads")
+        
+        # Initialize OpenAI
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
     def get_response(self, question: str) -> Dict:
         try:
+            # Get embedding for the question
             print(f"Getting embedding for question: {question}")
             embedding_response = self.client.embeddings.create(
                 model="text-embedding-ada-002",
                 input=question
             )
-            query_embedding = list(embedding_response.data[0].embedding)
+            query_embedding = list(embedding_response.data[0].embedding)  # Convert to list
             print(f"Generated embedding dimension: {len(query_embedding)}")
 
-            # Use Haystack's document store instead of direct Pinecone
-            results = self.document_store.query_by_embedding(
-                query_embedding=query_embedding,
+            # Query Pinecone with default namespace
+            print("Querying Pinecone...")
+            query_response = self.index.query(
+                vector=query_embedding,
                 top_k=5,
-                filters=None  # Add any filters if needed
+                include_metadata=True,
+                namespace="default"  # Explicitly query the default namespace
             )
-            print(f"Number of results: {len(results)}")
+            print(f"Raw Pinecone response: {query_response}")
+
+            # Extract relevant text from matches
+            matches = query_response.matches
+            print(f"Number of matches: {len(matches)}")
             
-            if not results:
+            if not matches:
                 return {
-                    "answer": "I couldn't find any relevant information in the documents.",
+                    "answer": "I couldn't find any relevant information in the documents. Please try rephrasing your question.",
                     "success": True,
                     "debug_info": {
                         "num_matches": 0,
@@ -38,8 +48,10 @@ class RFPChatbot:
                     }
                 }
 
-            context = "\n".join([doc.content for doc in results])
+            # Extract context from matches
+            context = "\n".join([match.metadata.get('content', '') for match in matches])
 
+            # Generate response
             response = self.client.chat.completions.create(
                 model="gpt-4o",
                 messages=[
@@ -54,7 +66,7 @@ class RFPChatbot:
                 "answer": response.choices[0].message.content,
                 "success": True,
                 "debug_info": {
-                    "num_matches": len(results),
+                    "num_matches": len(matches),
                     "context_length": len(context)
                 }
             }

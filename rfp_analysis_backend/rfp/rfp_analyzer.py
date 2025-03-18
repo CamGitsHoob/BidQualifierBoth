@@ -22,6 +22,7 @@ class RFPAnalyzer:
         Build a pipeline to extract key RFP information and format it as JSON.
         """
         try:
+            # Define the query template
             query_template = """
             System: You are an expert RFP analyzer. Extract information from the RFP and return it ONLY as a valid JSON object. Do not include any additional text.
             First, analyze the entire document and provide a strategic summary that includes:
@@ -140,10 +141,12 @@ class RFPAnalyzer:
                     "Creative": "",
                     "Media": "",
                     "Offline": "",
-
+                    
                 }
             }
             """
+
+            # First, get the embedding for our query text
             embed_pipeline = Pipeline()
             embed_pipeline.add_component(
                 "text_embedder",
@@ -153,6 +156,7 @@ class RFPAnalyzer:
                 )
             )
             
+            # Get the embedding
             embed_result = embed_pipeline.run({
                 "text_embedder": {
                     "text": text
@@ -162,8 +166,10 @@ class RFPAnalyzer:
                 print("No embedding generated")
                 return {}
             
+            # Extract the embedding vector
             query_embedding = embed_result["text_embedder"]["embedding"]
 
+            # Now use this embedding to query Pinecone
             query_pipeline = Pipeline()
             query_pipeline.add_component(
                 "retriever",
